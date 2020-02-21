@@ -76,7 +76,22 @@ type Key struct {
 
 // NewMasterKey creates a new Bitcoin master extended key from a seed
 func NewMasterKey(seed []byte) (*Key, error) {
-	return NewMasterKeyWithCurve(seed, CurveBitcoin)
+	hmac := hmac.New(sha512.New, []byte("ed25519 seed"))
+	if err != nil {
+		return nil, err
+	}
+	sum := hmac.Sum(nil)
+	key := &Key{
+		Version:     PrivateWalletVersion,
+		ChainCode:   sum[32:],
+		Key:         sum[:32],
+		Depth:       0x0,
+		ChildNumber: []byte{0x00, 0x00, 0x00, 0x00},
+		FingerPrint: []byte{0x00, 0x00, 0x00, 0x00},
+		IsPrivate:   true,
+		curve:       nil,
+	}
+	return key, nil
 }
 
 // NewMasterKey creates a new master extended key from a seed using the given curve
@@ -117,6 +132,7 @@ func NewMasterKeyWithCurve(seed []byte, curve *curve) (*Key, error) {
 // NewChildKey derives a child key from a given parent as outlined by bip32
 func (key *Key) NewChildKey(childIdx uint32) (*Key, error) {
 	// Fail early if trying to create hardned child from public key
+	if (key.curve != nil ){
 	if !key.IsPrivate && childIdx >= FirstHardenedChild {
 		return nil, ErrHardnedChildPublicKey
 	}
@@ -168,6 +184,29 @@ func (key *Key) NewChildKey(childIdx uint32) (*Key, error) {
 		childKey.FingerPrint = fingerprint[:4]
 		childKey.Key = key.curve.addPublicKeys(keyBytes, key.Key)
 	}
+}else{
+	//IF CURVE IS NIL THEN ITS USING ED25519
+	f i < FirstHardenedIndex {
+		return nil, ErrHardnedChildPublicKey
+	}
+
+	iBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(iBytes, childIdx)
+	key := append([]byte{0x0}, k.Key...)
+	data := append(key, iBytes...)
+
+	hmac := hmac.New(sha512.New, key.ChainCode)
+	_, err := hmac.Write(data)
+	if err != nil {
+		return nil, err
+	}
+	sum := hmac.Sum(nil)
+	childKey := &Key{
+		Key:       sum[:32],
+		ChainCode: sum[32:],
+	}
+	return childKey, nil
+}
 
 	return childKey, nil
 }
